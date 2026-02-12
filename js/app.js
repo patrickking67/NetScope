@@ -1,16 +1,15 @@
 /* ===== NetScope - Network Security Toolkit ===== */
 
-// ---------- State ----------
 const state = {
-  ip: null,
-  geo: null,
+  ip: null, geo: null,
   speed: { ping: null, download: null, upload: null },
-  breachStats: null,
-  dnsResults: null,
-  securityScan: null,
+  breach: { email: null, password: null },
+  scan: null,
 };
 
-// ---------- Init ----------
+// ============================================================
+// INIT
+// ============================================================
 document.addEventListener('DOMContentLoaded', () => {
   initNav();
   initExport();
@@ -18,10 +17,8 @@ document.addEventListener('DOMContentLoaded', () => {
   initPasswordToggle();
   initEventListeners();
   fetchIPInfo();
-  fetchBreachStats();
 });
 
-// ---------- Navigation ----------
 function initNav() {
   const links = document.querySelectorAll('.nav-link');
   const observer = new IntersectionObserver(entries => {
@@ -32,632 +29,721 @@ function initNav() {
         if (link) link.classList.add('active');
       }
     });
-  }, { threshold: 0.3, rootMargin: '-80px 0px 0px 0px' });
-
-  document.querySelectorAll('.card[id]').forEach(section => observer.observe(section));
+  }, { threshold: 0.2, rootMargin: '-80px 0px 0px 0px' });
+  document.querySelectorAll('section[id]').forEach(s => observer.observe(s));
 }
 
-// ---------- Export Panel ----------
 function initExport() {
   const trigger = document.getElementById('export-trigger');
   const panel = document.getElementById('export-panel');
-  trigger.addEventListener('click', e => {
-    e.stopPropagation();
-    panel.classList.toggle('open');
-  });
+  trigger.addEventListener('click', e => { e.stopPropagation(); panel.classList.toggle('open'); });
   document.addEventListener('click', e => {
-    if (!panel.contains(e.target) && e.target !== trigger) {
-      panel.classList.remove('open');
-    }
+    if (!panel.contains(e.target) && e.target !== trigger) panel.classList.remove('open');
   });
   document.getElementById('btn-copy').addEventListener('click', exportCopy);
   document.getElementById('btn-email').addEventListener('click', exportEmail);
   document.getElementById('btn-pdf').addEventListener('click', exportPDF);
 }
 
-// ---------- Breach Tabs ----------
 function initBreachTabs() {
   document.querySelectorAll('.breach-tab').forEach(tab => {
     tab.addEventListener('click', () => {
       document.querySelectorAll('.breach-tab').forEach(t => t.classList.remove('active'));
       tab.classList.add('active');
       document.querySelectorAll('.breach-content').forEach(c => c.classList.add('hidden'));
-      const target = tab.getAttribute('data-tab');
-      document.querySelector(`[data-tab-content="${target}"]`).classList.remove('hidden');
+      document.querySelector(`[data-tab-content="${tab.dataset.tab}"]`).classList.remove('hidden');
     });
   });
 }
 
-// ---------- Password Toggle ----------
 function initPasswordToggle() {
   const toggle = document.getElementById('toggle-password');
   const input = document.getElementById('password-input');
   toggle.addEventListener('click', () => {
-    const isPassword = input.type === 'password';
-    input.type = isPassword ? 'text' : 'password';
-    toggle.title = isPassword ? 'Hide password' : 'Show password';
+    input.type = input.type === 'password' ? 'text' : 'password';
   });
 }
 
-// ---------- Event Listeners ----------
 function initEventListeners() {
   document.getElementById('btn-speed-test').addEventListener('click', runSpeedTest);
-  document.getElementById('btn-breach-check').addEventListener('click', checkPassword);
-  document.getElementById('btn-dns-lookup').addEventListener('click', dnsLookup);
-  document.getElementById('btn-security-scan').addEventListener('click', runSecurityScan);
-  document.getElementById('password-input').addEventListener('keydown', e => {
-    if (e.key === 'Enter') checkPassword();
-  });
-  document.getElementById('dns-domain').addEventListener('keydown', e => {
-    if (e.key === 'Enter') dnsLookup();
-  });
+  document.getElementById('btn-email-check').addEventListener('click', checkEmailBreach);
+  document.getElementById('btn-password-check').addEventListener('click', checkPasswordBreach);
+  document.getElementById('btn-scan').addEventListener('click', runDNSScan);
+  document.getElementById('password-input').addEventListener('keydown', e => { if (e.key === 'Enter') checkPasswordBreach(); });
+  document.getElementById('email-input').addEventListener('keydown', e => { if (e.key === 'Enter') checkEmailBreach(); });
+  document.getElementById('scan-input').addEventListener('keydown', e => { if (e.key === 'Enter') runDNSScan(); });
 }
 
 // ============================================================
-// IP INFO & GEOLOCATION
+// IP & LOCATION - robust fallback chain
 // ============================================================
 async function fetchIPInfo() {
-  try {
-    const res = await fetch('https://ipwho.is/');
-    const data = await res.json();
-    if (!data.success) throw new Error(data.message);
-    state.ip = data.ip;
-    state.geo = data;
-    renderIPInfo(data);
-    renderGeo(data);
-  } catch (err) {
-    console.error('IP fetch failed:', err);
-    document.getElementById('ip-address').textContent = 'Error loading IP';
-    // Fallback: try ipapi
+  // Step 1: Get IP
+  let ip = null;
+  const ipApis = [
+    'https://api.ipify.org?format=json',
+    'https://api.seeip.org/jsonip',
+    'https://api64.ipify.org?format=json',
+  ];
+  for (const url of ipApis) {
     try {
-      const res = await fetch('https://ipapi.co/json/');
-      const data = await res.json();
-      state.ip = data.ip;
-      state.geo = data;
-      renderIPInfoFallback(data);
-      renderGeoFallback(data);
-    } catch (e2) {
-      console.error('Fallback IP fetch also failed:', e2);
-    }
+      const r = await fetch(url);
+      const d = await r.json();
+      ip = d.ip;
+      if (ip) break;
+    } catch {}
   }
+  if (!ip) {
+    document.getElementById('ip-address').textContent = 'Could not detect';
+    clearSkeletons();
+    return;
+  }
+  document.getElementById('ip-address').textContent = ip;
+  state.ip = ip;
+
+  // Step 2: Get geo/network info with fallback
+  const geoApis = [
+    { url: `https://ipapi.co/${ip}/json/`, parse: parseIpapiCo },
+    { url: `https://ipwho.is/${ip}`, parse: parseIpwhois },
+    { url: `https://freeipapi.com/api/json/${ip}`, parse: parseFreeipapi },
+  ];
+  for (const api of geoApis) {
+    try {
+      const r = await fetch(api.url);
+      if (!r.ok) continue;
+      const d = await r.json();
+      const geo = api.parse(d);
+      if (geo && geo.country) {
+        state.geo = geo;
+        renderGeo(geo);
+        return;
+      }
+    } catch {}
+  }
+  clearSkeletons();
 }
 
-function renderIPInfo(d) {
-  document.getElementById('ip-address').textContent = d.ip;
-  setVal('info-isp', d.connection?.isp || 'N/A');
-  setVal('info-org', d.connection?.org || 'N/A');
-  setVal('info-asn', d.connection?.asn ? `AS${d.connection.asn}` : 'N/A');
-  setVal('info-type', d.type || 'N/A');
-  setVal('info-proxy', d.security?.proxy ? 'Yes' : 'No');
-  setVal('info-hosting', d.security?.hosting ? 'Yes' : 'No');
+function parseIpapiCo(d) {
+  if (d.error) return null;
+  return {
+    ip: d.ip, isp: d.org || 'N/A', org: d.org || 'N/A',
+    asn: d.asn || 'N/A', type: d.version || 'N/A',
+    proxy: false, hosting: false,
+    country: d.country_name, countryCode: d.country_code,
+    region: d.region, city: d.city, postal: d.postal,
+    lat: d.latitude, lng: d.longitude,
+    timezone: d.timezone, flag: d.country_code,
+  };
 }
 
-function renderIPInfoFallback(d) {
-  document.getElementById('ip-address').textContent = d.ip;
-  setVal('info-isp', d.org || 'N/A');
-  setVal('info-org', d.org || 'N/A');
-  setVal('info-asn', d.asn || 'N/A');
-  setVal('info-type', d.version || 'N/A');
-  setVal('info-proxy', 'N/A');
-  setVal('info-hosting', 'N/A');
+function parseIpwhois(d) {
+  if (!d.success) return null;
+  return {
+    ip: d.ip, isp: d.connection?.isp || 'N/A', org: d.connection?.org || 'N/A',
+    asn: d.connection?.asn ? `AS${d.connection.asn}` : 'N/A', type: d.type || 'N/A',
+    proxy: d.security?.proxy || false, hosting: d.security?.hosting || false,
+    country: d.country, countryCode: d.country_code,
+    region: d.region, city: d.city, postal: d.postal,
+    lat: d.latitude, lng: d.longitude,
+    timezone: d.timezone?.id || 'N/A', flag: d.country_code,
+  };
 }
 
-function renderGeo(d) {
-  const el = id => document.getElementById(id);
-  el('geo-country').innerHTML = `${d.flag?.emoji || ''} ${d.country || 'N/A'}`;
-  setVal('geo-region', d.region || 'N/A');
-  setVal('geo-city', d.city || 'N/A');
-  setVal('geo-postal', d.postal || 'N/A');
-  setVal('geo-coords', `${d.latitude?.toFixed(4)}, ${d.longitude?.toFixed(4)}`);
-  setVal('geo-timezone', d.timezone?.id || 'N/A');
-  initMap(d.latitude, d.longitude);
+function parseFreeipapi(d) {
+  return {
+    ip: d.ipAddress, isp: d.isp || 'N/A', org: d.isp || 'N/A',
+    asn: 'N/A', type: d.ipVersion ? `IPv${d.ipVersion}` : 'N/A',
+    proxy: d.isProxy || false, hosting: false,
+    country: d.countryName, countryCode: d.countryCode,
+    region: d.regionName, city: d.cityName, postal: d.zipCode,
+    lat: d.latitude, lng: d.longitude,
+    timezone: d.timeZone, flag: d.countryCode,
+  };
 }
 
-function renderGeoFallback(d) {
-  setVal('geo-country', d.country_name || 'N/A');
-  setVal('geo-region', d.region || 'N/A');
-  setVal('geo-city', d.city || 'N/A');
-  setVal('geo-postal', d.postal || 'N/A');
-  setVal('geo-coords', `${d.latitude}, ${d.longitude}`);
-  setVal('geo-timezone', d.timezone || 'N/A');
-  initMap(d.latitude, d.longitude);
+function renderGeo(g) {
+  setVal('info-isp', g.isp);
+  setVal('info-org', g.org);
+  setVal('info-asn', g.asn);
+  setVal('info-type', g.type);
+  setVal('info-proxy', g.proxy ? 'Yes - Detected' : 'No');
+  setVal('info-hosting', g.hosting ? 'Yes' : 'No');
+  const flag = g.countryCode ? countryFlag(g.countryCode) + ' ' : '';
+  setVal('geo-country', flag + (g.country || 'N/A'));
+  setVal('geo-region', g.region || 'N/A');
+  setVal('geo-city', g.city || 'N/A');
+  setVal('geo-postal', g.postal || 'N/A');
+  setVal('geo-coords', g.lat && g.lng ? `${Number(g.lat).toFixed(4)}, ${Number(g.lng).toFixed(4)}` : 'N/A');
+  setVal('geo-timezone', g.timezone || 'N/A');
+  if (g.lat && g.lng) initMap(g.lat, g.lng);
+}
+
+function clearSkeletons() {
+  document.querySelectorAll('.skeleton').forEach(el => {
+    el.classList.remove('skeleton');
+    if (!el.textContent.trim()) el.textContent = 'N/A';
+  });
 }
 
 function initMap(lat, lng) {
-  if (!lat || !lng) return;
-  const map = L.map('map', {
-    zoomControl: true,
-    attributionControl: false,
-    scrollWheelZoom: false,
-  }).setView([lat, lng], 11);
-
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 18,
-  }).addTo(map);
-
+  const map = L.map('map', { zoomControl: true, attributionControl: false, scrollWheelZoom: false })
+    .setView([lat, lng], 11);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 }).addTo(map);
   L.circleMarker([lat, lng], {
-    radius: 10,
-    fillColor: '#3b82f6',
-    color: '#3b82f6',
-    weight: 2,
-    opacity: 0.8,
-    fillOpacity: 0.3,
+    radius: 10, fillColor: '#3b82f6', color: '#3b82f6',
+    weight: 2, opacity: 0.8, fillOpacity: 0.3,
   }).addTo(map);
+  setTimeout(() => map.invalidateSize(), 400);
+}
 
-  // Fix map rendering in hidden/animated containers
-  setTimeout(() => map.invalidateSize(), 300);
+function countryFlag(code) {
+  if (!code || code.length !== 2) return '';
+  return String.fromCodePoint(...[...code.toUpperCase()].map(c => 0x1F1E6 + c.charCodeAt(0) - 65));
 }
 
 // ============================================================
-// SPEED TEST
+// SPEED TEST - Cloudflare endpoints + fallback
 // ============================================================
-let speedTestRunning = false;
+let speedRunning = false;
 
 async function runSpeedTest() {
-  if (speedTestRunning) return;
-  speedTestRunning = true;
-
+  if (speedRunning) return;
+  speedRunning = true;
   const btn = document.getElementById('btn-speed-test');
-  const status = document.getElementById('speed-status');
+  const phase = document.getElementById('speed-phase');
+  const ring = document.getElementById('gauge-ring');
   btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> Testing...';
+  btn.textContent = 'Testing...';
+  ring.classList.add('active');
+  phase.classList.add('active');
+  resetGauge();
 
   try {
-    // Phase 1: Latency
-    status.textContent = 'Testing latency...';
-    const ping = await testLatency();
+    // PING
+    phase.textContent = 'Testing latency...';
+    const ping = await testPing();
     state.speed.ping = ping;
-    document.getElementById('speed-ping').textContent = ping.toFixed(0);
+    animateNumber(document.getElementById('speed-ping'), ping, 0);
 
-    // Phase 2: Download
-    status.textContent = 'Testing download speed...';
-    const download = await testDownload();
-    state.speed.download = download;
-    document.getElementById('speed-download').textContent = download.toFixed(1);
-    updateGauge(download);
-    document.getElementById('gauge-number').textContent = download.toFixed(1);
+    // DOWNLOAD
+    phase.textContent = 'Testing download...';
+    const dl = await testDownload();
+    state.speed.download = dl;
+    animateNumber(document.getElementById('speed-download'), dl, 1);
+    setGauge(dl);
+    animateNumber(document.getElementById('gauge-number'), dl, 1);
 
-    // Phase 3: Upload
-    status.textContent = 'Testing upload speed...';
-    const upload = await testUpload();
-    state.speed.upload = upload;
-    document.getElementById('speed-upload').textContent = upload.toFixed(1);
+    // UPLOAD
+    phase.textContent = 'Testing upload...';
+    const ul = await testUpload();
+    state.speed.upload = ul;
+    animateNumber(document.getElementById('speed-upload'), ul, 1);
 
-    status.textContent = 'Test complete';
+    phase.textContent = 'Test complete';
   } catch (err) {
     console.error('Speed test error:', err);
-    status.textContent = 'Speed test encountered an error. Results may be partial.';
+    phase.textContent = 'Test finished with partial results';
   } finally {
-    speedTestRunning = false;
+    speedRunning = false;
     btn.disabled = false;
-    btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><polygon points="5 3 19 12 5 21 5 3"/></svg> Run Again`;
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><polygon points="5 3 19 12 5 21 5 3"/></svg> Run Again';
+    ring.classList.remove('active');
+    phase.classList.remove('active');
   }
 }
 
-async function testLatency() {
+async function testPing() {
   const results = [];
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 6; i++) {
     const start = performance.now();
     try {
-      await fetch(`https://httpbin.org/status/200?_=${Date.now()}-${i}`, {
-        method: 'HEAD',
-        cache: 'no-store',
-      });
+      await fetch(`https://www.google.com/generate_204?_=${Date.now()}-${i}`, { mode: 'no-cors', cache: 'no-store' });
     } catch {
-      await fetch(`https://www.google.com/generate_204?_=${Date.now()}-${i}`, {
-        method: 'HEAD',
-        mode: 'no-cors',
-        cache: 'no-store',
-      });
+      await fetch(`https://1.1.1.1/cdn-cgi/trace?_=${Date.now()}-${i}`, { mode: 'no-cors', cache: 'no-store' });
     }
     results.push(performance.now() - start);
   }
   results.sort((a, b) => a - b);
-  return results[Math.floor(results.length / 2)]; // median
+  // Drop highest and lowest, take median of rest
+  const trimmed = results.slice(1, -1);
+  return trimmed[Math.floor(trimmed.length / 2)];
 }
 
 async function testDownload() {
-  const sizes = [500000, 1000000, 2000000, 5000000];
-  let bestSpeed = 0;
+  // Try Cloudflare speed endpoint first, fallback to generating test payloads
+  const cfWorks = await testCfEndpoint();
+  if (cfWorks) return await cfDownload();
+  return await fallbackDownload();
+}
 
-  for (const size of sizes) {
+async function testCfEndpoint() {
+  try {
+    const r = await fetch(`https://speed.cloudflare.com/__down?measId=${Date.now()}&bytes=1000`, { cache: 'no-store' });
+    return r.ok;
+  } catch { return false; }
+}
+
+async function cfDownload() {
+  const sizes = [100000, 1000000, 5000000, 10000000, 25000000];
+  let bestSpeed = 0;
+  for (const bytes of sizes) {
     try {
       const start = performance.now();
-      const res = await fetch(`https://httpbin.org/bytes/${size}?_=${Date.now()}`, {
-        cache: 'no-store',
-      });
-      await res.arrayBuffer();
-      const elapsed = (performance.now() - start) / 1000; // seconds
-      const speed = (size * 8) / elapsed / 1000000; // Mbps
-      if (speed > bestSpeed) bestSpeed = speed;
-      updateGauge(speed);
-      document.getElementById('gauge-number').textContent = speed.toFixed(1);
-      // If test took too long on small size, skip larger sizes
-      if (elapsed > 8) break;
-    } catch {
-      break;
+      const r = await fetch(`https://speed.cloudflare.com/__down?measId=${Date.now()}&bytes=${bytes}`, { cache: 'no-store' });
+      await r.arrayBuffer();
+      const secs = (performance.now() - start) / 1000;
+      const mbps = (bytes * 8) / secs / 1e6;
+      if (mbps > bestSpeed) bestSpeed = mbps;
+      setGauge(mbps);
+      animateNumber(document.getElementById('gauge-number'), mbps, 1);
+      if (secs > 5) break; // enough data
+    } catch { break; }
+  }
+  return bestSpeed;
+}
+
+async function fallbackDownload() {
+  // Use known CDN resources with cache-busting
+  const urls = [
+    { url: 'https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js', size: 71000 },
+    { url: 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js', size: 640000 },
+  ];
+  let bestSpeed = 0;
+  for (const { url, size } of urls) {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const start = performance.now();
+        const r = await fetch(`${url}?_=${Date.now()}-${attempt}`, { cache: 'no-store' });
+        const buf = await r.arrayBuffer();
+        const secs = (performance.now() - start) / 1000;
+        const mbps = (buf.byteLength * 8) / secs / 1e6;
+        if (mbps > bestSpeed) bestSpeed = mbps;
+        setGauge(mbps);
+        animateNumber(document.getElementById('gauge-number'), mbps, 1);
+      } catch { break; }
     }
   }
-  return bestSpeed || 0;
+  return bestSpeed;
 }
 
 async function testUpload() {
-  const size = 1000000; // 1MB
+  const size = 2000000; // 2MB
   const data = new Blob([new ArrayBuffer(size)]);
+  // Try Cloudflare first
   try {
     const start = performance.now();
-    await fetch('https://httpbin.org/post', {
-      method: 'POST',
-      body: data,
-      cache: 'no-store',
-    });
-    const elapsed = (performance.now() - start) / 1000;
-    return (size * 8) / elapsed / 1000000; // Mbps
-  } catch {
-    return 0;
+    const r = await fetch('https://speed.cloudflare.com/__up', { method: 'POST', body: data, cache: 'no-store' });
+    if (r.ok) {
+      const secs = (performance.now() - start) / 1000;
+      return (size * 8) / secs / 1e6;
+    }
+  } catch {}
+  // Fallback: POST to httpbin
+  try {
+    const smallData = new Blob([new ArrayBuffer(500000)]);
+    const start = performance.now();
+    await fetch('https://httpbin.org/post', { method: 'POST', body: smallData, cache: 'no-store' });
+    const secs = (performance.now() - start) / 1000;
+    return (500000 * 8) / secs / 1e6;
+  } catch { return 0; }
+}
+
+function resetGauge() {
+  document.getElementById('gauge-circle').style.strokeDashoffset = '364.42';
+  document.getElementById('gauge-number').textContent = '0';
+  document.getElementById('speed-ping').textContent = '--';
+  document.getElementById('speed-download').textContent = '--';
+  document.getElementById('speed-upload').textContent = '--';
+}
+
+function setGauge(mbps) {
+  const circumference = 2 * Math.PI * 58; // 364.42
+  const maxSpeed = 300;
+  const pct = Math.min(mbps / maxSpeed, 1);
+  document.getElementById('gauge-circle').style.strokeDashoffset = circumference * (1 - pct);
+}
+
+function animateNumber(el, target, decimals = 1, duration = 600) {
+  const start = parseFloat(el.textContent) || 0;
+  const startTime = performance.now();
+  function tick(now) {
+    const t = Math.min((now - startTime) / duration, 1);
+    const eased = 1 - Math.pow(1 - t, 3); // ease-out cubic
+    el.textContent = (start + (target - start) * eased).toFixed(decimals);
+    if (t < 1) requestAnimationFrame(tick);
   }
-}
-
-function updateGauge(speedMbps) {
-  const circle = document.getElementById('gauge-circle');
-  const circumference = 2 * Math.PI * 52; // 326.73
-  const maxSpeed = 200; // Mbps for full gauge
-  const pct = Math.min(speedMbps / maxSpeed, 1);
-  const offset = circumference * (1 - pct);
-  circle.style.strokeDashoffset = offset;
+  requestAnimationFrame(tick);
 }
 
 // ============================================================
-// BREACH CHECK (Have I Been Pwned)
+// BREACH CHECK - EMAIL (XposedOrNot + HIBP link fallback)
 // ============================================================
-async function checkPassword() {
-  const input = document.getElementById('password-input');
-  const password = input.value;
-  if (!password) {
-    showToast('Enter a password to check');
+async function checkEmailBreach() {
+  const email = document.getElementById('email-input').value.trim();
+  if (!email || !email.includes('@')) {
+    showToast('Enter a valid email address');
     return;
   }
+  const resultEl = document.getElementById('email-result');
+  const btn = document.getElementById('btn-email-check');
+  btn.disabled = true;
+  resultEl.innerHTML = '<div style="color:var(--text-muted);text-align:center;padding:20px;">Checking breaches...</div>';
 
-  const resultEl = document.getElementById('breach-result');
-  resultEl.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding: 20px;">Checking...</div>';
+  let found = false;
+  let breaches = [];
+
+  // Try XposedOrNot API (free, no key)
+  try {
+    const r = await fetch(`https://api.xposedornot.com/v1/check-email/${encodeURIComponent(email)}`);
+    if (r.ok) {
+      const data = await r.json();
+      if (data.breaches && data.breaches.length > 0) {
+        found = true;
+        breaches = data.breaches.map(b => typeof b === 'string' ? { name: b } : b);
+      }
+    } else if (r.status === 404) {
+      // Not found = safe
+    }
+  } catch {
+    // API failed - try alternate
+    try {
+      const r = await fetch(`https://api.xposedornot.com/v1/breach-analytics?email=${encodeURIComponent(email)}`);
+      if (r.ok) {
+        const data = await r.json();
+        const exposedBreaches = data.ExposedBreaches?.breaches_details;
+        if (exposedBreaches && exposedBreaches.length > 0) {
+          found = true;
+          breaches = exposedBreaches.map(b => ({ name: b.breach, domain: b.domain }));
+        }
+      }
+    } catch {}
+  }
+
+  if (found && breaches.length > 0) {
+    resultEl.innerHTML = `
+      <div class="result-card result-card--danger">
+        <div class="result-icon">&#x26A0;&#xFE0F;</div>
+        <div class="result-title">Found in ${breaches.length} breach${breaches.length > 1 ? 'es' : ''}</div>
+        <div class="result-sub">This email has appeared in known data breaches.</div>
+      </div>
+      <div class="breach-list">
+        ${breaches.map(b => `<div class="breach-item"><div class="breach-item-name">${esc(b.name || b.breach || 'Unknown')}</div>${b.domain ? `<div class="breach-item-domain">${esc(b.domain)}</div>` : ''}</div>`).join('')}
+      </div>
+      <a href="https://haveibeenpwned.com/account/${encodeURIComponent(email)}" target="_blank" rel="noopener" class="hibp-link">View full details on Have I Been Pwned &rarr;</a>
+    `;
+  } else if (found === false) {
+    resultEl.innerHTML = `
+      <div class="result-card result-card--safe">
+        <div class="result-icon">&#x2705;</div>
+        <div class="result-title">No breaches found</div>
+        <div class="result-sub">This email wasn't found in our breach database check.</div>
+      </div>
+      <a href="https://haveibeenpwned.com/account/${encodeURIComponent(email)}" target="_blank" rel="noopener" class="hibp-link">Double-check on Have I Been Pwned &rarr;</a>
+    `;
+  }
+
+  state.breach.email = { email, found, count: breaches.length };
+  btn.disabled = false;
+}
+
+// ============================================================
+// BREACH CHECK - PASSWORD (HIBP k-anonymity)
+// ============================================================
+async function checkPasswordBreach() {
+  const password = document.getElementById('password-input').value;
+  if (!password) { showToast('Enter a password to check'); return; }
+
+  const resultEl = document.getElementById('password-result');
+  const btn = document.getElementById('btn-password-check');
+  btn.disabled = true;
+  resultEl.innerHTML = '<div style="color:var(--text-muted);text-align:center;padding:20px;">Checking...</div>';
 
   try {
-    // SHA-1 hash
     const encoder = new TextEncoder();
-    const data = encoder.encode(password);
-    const hashBuffer = await crypto.subtle.digest('SHA-1', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+    const hashBuffer = await crypto.subtle.digest('SHA-1', encoder.encode(password));
+    const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
     const prefix = hashHex.substring(0, 5);
     const suffix = hashHex.substring(5);
 
-    // Query HIBP k-anonymity API
-    const res = await fetch(`https://api.pwnedpasswords.com/range/${prefix}`);
-    const text = await res.text();
-    const lines = text.split('\n');
-
+    const r = await fetch(`https://api.pwnedpasswords.com/range/${prefix}`);
+    const text = await r.text();
     let count = 0;
-    for (const line of lines) {
-      const [hashSuffix, c] = line.split(':');
-      if (hashSuffix.trim() === suffix) {
-        count = parseInt(c.trim(), 10);
-        break;
-      }
+    for (const line of text.split('\n')) {
+      const [h, c] = line.split(':');
+      if (h.trim() === suffix) { count = parseInt(c.trim(), 10); break; }
     }
 
     if (count === 0) {
       resultEl.innerHTML = `
-        <div class="breach-result--safe">
+        <div class="result-card result-card--safe">
           <div class="result-icon">&#x2705;</div>
-          <div class="result-text">No breaches found</div>
-          <div class="result-sub">This password has not appeared in any known data breaches.</div>
+          <div class="result-title">Not found in any breaches</div>
+          <div class="result-sub">This password hasn't appeared in known data breaches. Still use unique passwords everywhere.</div>
         </div>`;
     } else {
       resultEl.innerHTML = `
-        <div class="breach-result--danger">
+        <div class="result-card result-card--danger">
           <div class="result-icon">&#x26A0;&#xFE0F;</div>
-          <div class="result-text">Found in ${count.toLocaleString()} breaches</div>
-          <div class="result-sub">This password has been exposed. You should change it immediately.</div>
+          <div class="result-title">Found ${count.toLocaleString()} times</div>
+          <div class="result-sub">This password has been seen in data breaches. Change it immediately and never reuse it.</div>
         </div>`;
     }
+    state.breach.password = { count };
   } catch (err) {
-    console.error('Breach check error:', err);
-    resultEl.innerHTML = '<div style="color: var(--accent-red); text-align: center; padding: 20px;">Error checking password. Please try again.</div>';
+    console.error('Password check error:', err);
+    resultEl.innerHTML = '<div style="color:var(--accent-red);text-align:center;padding:20px;">Error checking password. Try again.</div>';
   }
-}
-
-// ---------- Breach Stats ----------
-async function fetchBreachStats() {
-  try {
-    const res = await fetch('https://haveibeenpwned.com/api/v3/breaches');
-    const breaches = await res.json();
-    state.breachStats = breaches;
-
-    const totalBreaches = breaches.length;
-    const totalAccounts = breaches.reduce((sum, b) => sum + (b.PwnCount || 0), 0);
-    const sorted = [...breaches].sort((a, b) => new Date(b.BreachDate) - new Date(a.BreachDate));
-    const latest = sorted[0];
-
-    document.getElementById('stat-total-breaches').textContent = totalBreaches.toLocaleString();
-    document.getElementById('stat-total-accounts').textContent = formatLargeNumber(totalAccounts);
-    document.getElementById('stat-latest-breach').textContent = latest?.Name || 'N/A';
-
-    // Render recent breaches
-    const listEl = document.getElementById('breach-list');
-    listEl.innerHTML = sorted.slice(0, 30).map(b => `
-      <div class="breach-item">
-        <div>
-          <div class="breach-item-name">${escapeHtml(b.Name)}</div>
-          <div class="breach-item-date">${b.BreachDate}</div>
-        </div>
-        <div class="breach-item-count">${formatLargeNumber(b.PwnCount)}</div>
-      </div>
-    `).join('');
-  } catch (err) {
-    console.error('Failed to load breach stats:', err);
-    document.getElementById('stat-total-breaches').textContent = 'N/A';
-    document.getElementById('stat-total-accounts').textContent = 'N/A';
-    document.getElementById('stat-latest-breach').textContent = 'N/A';
-  }
+  btn.disabled = false;
 }
 
 // ============================================================
-// DNS LOOKUP
+// DNS & SECURITY SCAN
 // ============================================================
-async function dnsLookup() {
-  const domain = document.getElementById('dns-domain').value.trim();
-  const type = document.getElementById('dns-type').value;
-  const resultsEl = document.getElementById('dns-results');
+async function runDNSScan() {
+  const raw = document.getElementById('scan-input').value.trim();
+  if (!raw) { showToast('Enter a domain or email'); return; }
 
-  if (!domain) {
-    showToast('Enter a domain name');
-    return;
-  }
-
-  resultsEl.innerHTML = '<div style="color: var(--text-muted); padding: 10px;">Resolving...</div>';
-
-  try {
-    const res = await fetch(`https://dns.google/resolve?name=${encodeURIComponent(domain)}&type=${type}`);
-    const data = await res.json();
-    state.dnsResults = data;
-
-    if (!data.Answer || data.Answer.length === 0) {
-      resultsEl.innerHTML = '<div style="color: var(--text-muted); padding: 10px;">No records found.</div>';
-      return;
-    }
-
-    resultsEl.innerHTML = data.Answer.map(record => `
-      <div class="dns-record">
-        <span class="dns-record-type">${escapeHtml(typeFromInt(record.type))}</span>
-        <span class="dns-record-value">${escapeHtml(record.data)}</span>
-        <span class="dns-record-ttl">TTL ${record.TTL}s</span>
-      </div>
-    `).join('');
-  } catch (err) {
-    console.error('DNS lookup error:', err);
-    resultsEl.innerHTML = '<div style="color: var(--accent-red); padding: 10px;">DNS lookup failed.</div>';
-  }
-}
-
-function typeFromInt(t) {
-  const types = { 1: 'A', 2: 'NS', 5: 'CNAME', 6: 'SOA', 15: 'MX', 16: 'TXT', 28: 'AAAA', 33: 'SRV' };
-  return types[t] || `TYPE${t}`;
-}
-
-// ============================================================
-// SECURITY SCAN
-// ============================================================
-async function runSecurityScan() {
-  const resultsEl = document.getElementById('security-results');
-  const btn = document.getElementById('btn-security-scan');
+  const btn = document.getElementById('btn-scan');
+  const resultsEl = document.getElementById('scan-results');
   btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> Scanning...';
-  resultsEl.innerHTML = '';
+  btn.textContent = 'Scanning...';
+  resultsEl.innerHTML = '<div style="color:var(--text-muted);text-align:center;padding:24px;">Running scan...</div>';
 
+  // Extract domain from email or raw domain
+  const domain = raw.includes('@') ? raw.split('@')[1] : raw.replace(/^https?:\/\//, '').split('/')[0];
+  const isEmail = raw.includes('@');
+
+  let html = '';
+
+  // 1. DNS Records
+  html += '<div class="scan-section"><div class="scan-section-title">DNS Records</div>';
+  const recordTypes = ['A', 'AAAA', 'MX', 'NS'];
+  for (const type of recordTypes) {
+    try {
+      const r = await fetch(`https://dns.google/resolve?name=${encodeURIComponent(domain)}&type=${type}`);
+      const data = await r.json();
+      if (data.Answer && data.Answer.length > 0) {
+        for (const rec of data.Answer) {
+          html += `<div class="dns-record">
+            <span class="dns-record-type">${dnsTypeName(rec.type)}</span>
+            <span class="dns-record-value">${esc(rec.data)}</span>
+            <span class="dns-record-ttl">TTL ${rec.TTL}s</span>
+          </div>`;
+        }
+      }
+    } catch {}
+  }
+  html += '</div>';
+
+  // 2. Email Security (SPF, DMARC, DKIM)
+  html += '<div class="scan-section"><div class="scan-section-title">Email Security</div>';
   const checks = [];
 
-  // 1. DNSSEC check
+  // SPF
   try {
-    const res = await fetch('https://dns.google/resolve?name=cloudflare.com&type=A&do=1');
-    const data = await res.json();
-    const hasDnssec = data.AD === true;
-    checks.push({
-      icon: hasDnssec ? 'pass' : 'info',
-      name: 'DNSSEC Validation',
-      detail: hasDnssec ? 'Your DNS resolver validates DNSSEC signatures' : 'DNSSEC validation status could not be confirmed',
-    });
-  } catch {
-    checks.push({ icon: 'warn', name: 'DNSSEC Validation', detail: 'Could not test DNSSEC' });
-  }
-
-  // 2. DNS over HTTPS check
-  try {
-    await fetch('https://dns.google/resolve?name=example.com&type=A');
-    checks.push({
-      icon: 'pass',
-      name: 'DNS over HTTPS (DoH)',
-      detail: 'Your browser can reach DNS-over-HTTPS endpoints',
-    });
-  } catch {
-    checks.push({ icon: 'warn', name: 'DNS over HTTPS (DoH)', detail: 'DoH endpoints may be blocked' });
-  }
-
-  // 3. WebRTC leak check
-  try {
-    const ips = await checkWebRTCLeak();
-    if (ips.length === 0) {
-      checks.push({ icon: 'pass', name: 'WebRTC Leak Test', detail: 'No local IP addresses leaked via WebRTC' });
+    const r = await fetch(`https://dns.google/resolve?name=${encodeURIComponent(domain)}&type=TXT`);
+    const data = await r.json();
+    const spfRecord = data.Answer?.find(a => a.data && a.data.includes('v=spf1'));
+    if (spfRecord) {
+      checks.push({ icon: 'pass', name: 'SPF Record', detail: 'Sender Policy Framework is configured', value: spfRecord.data });
     } else {
-      checks.push({ icon: 'warn', name: 'WebRTC Leak Test', detail: `Local IPs detected: ${ips.join(', ')}` });
+      checks.push({ icon: 'fail', name: 'SPF Record', detail: 'No SPF record found - emails can be spoofed' });
     }
   } catch {
-    checks.push({ icon: 'info', name: 'WebRTC Leak Test', detail: 'Could not perform WebRTC leak test' });
+    checks.push({ icon: 'warn', name: 'SPF Record', detail: 'Could not check SPF' });
   }
 
-  // 4. HTTPS check
+  // DMARC
+  try {
+    const r = await fetch(`https://dns.google/resolve?name=_dmarc.${encodeURIComponent(domain)}&type=TXT`);
+    const data = await r.json();
+    const dmarcRecord = data.Answer?.find(a => a.data && a.data.includes('v=DMARC1'));
+    if (dmarcRecord) {
+      const policy = dmarcRecord.data.match(/p=(\w+)/)?.[1] || 'unknown';
+      checks.push({
+        icon: policy === 'reject' ? 'pass' : policy === 'quarantine' ? 'pass' : 'warn',
+        name: 'DMARC Policy',
+        detail: `Policy: ${policy}${policy === 'none' ? ' (monitoring only - not enforcing)' : ''}`,
+        value: dmarcRecord.data,
+      });
+    } else {
+      checks.push({ icon: 'fail', name: 'DMARC Policy', detail: 'No DMARC record found - domain is vulnerable to email spoofing' });
+    }
+  } catch {
+    checks.push({ icon: 'warn', name: 'DMARC Policy', detail: 'Could not check DMARC' });
+  }
+
+  // DKIM (check common selectors)
+  const dkimSelectors = ['default', 'google', 'selector1', 'selector2', 'k1', 's1', 'dkim'];
+  let dkimFound = false;
+  for (const sel of dkimSelectors) {
+    try {
+      const r = await fetch(`https://dns.google/resolve?name=${sel}._domainkey.${encodeURIComponent(domain)}&type=TXT`);
+      const data = await r.json();
+      if (data.Answer && data.Answer.length > 0 && data.Answer.some(a => a.data?.includes('v=DKIM1') || a.data?.includes('p='))) {
+        dkimFound = true;
+        checks.push({ icon: 'pass', name: 'DKIM', detail: `DKIM key found at selector: ${sel}` });
+        break;
+      }
+    } catch {}
+  }
+  if (!dkimFound) {
+    checks.push({ icon: 'info', name: 'DKIM', detail: 'No DKIM keys found at common selectors (may use custom selectors)' });
+  }
+
+  // DNSSEC
+  try {
+    const r = await fetch(`https://dns.google/resolve?name=${encodeURIComponent(domain)}&type=A&do=1`);
+    const data = await r.json();
+    checks.push({
+      icon: data.AD ? 'pass' : 'warn',
+      name: 'DNSSEC',
+      detail: data.AD ? 'DNSSEC signatures are validated for this domain' : 'DNSSEC is not enabled or not validated',
+    });
+  } catch {
+    checks.push({ icon: 'warn', name: 'DNSSEC', detail: 'Could not verify DNSSEC' });
+  }
+
+  // MX check
+  try {
+    const r = await fetch(`https://dns.google/resolve?name=${encodeURIComponent(domain)}&type=MX`);
+    const data = await r.json();
+    if (data.Answer && data.Answer.length > 0) {
+      const mxServers = data.Answer.map(a => a.data).join(', ');
+      checks.push({ icon: 'info', name: 'Mail Servers', detail: `${data.Answer.length} MX record(s) found`, value: mxServers });
+    } else {
+      checks.push({ icon: 'warn', name: 'Mail Servers', detail: 'No MX records found - domain may not receive email' });
+    }
+  } catch {}
+
+  // WebRTC leak check
+  try {
+    const ips = await checkWebRTC();
+    checks.push({
+      icon: ips.length === 0 ? 'pass' : 'warn',
+      name: 'WebRTC Leak',
+      detail: ips.length === 0 ? 'No local IPs leaked via WebRTC' : `Local IPs detected: ${ips.join(', ')}`,
+    });
+  } catch {}
+
+  // HTTPS
   checks.push({
     icon: location.protocol === 'https:' ? 'pass' : 'fail',
-    name: 'HTTPS Connection',
-    detail: location.protocol === 'https:' ? 'You are connected via HTTPS' : 'This page is not using HTTPS',
+    name: 'Your Connection',
+    detail: location.protocol === 'https:' ? 'You are browsing this page over HTTPS' : 'Not using HTTPS',
   });
 
-  // 5. Proxy/VPN detection
-  if (state.geo) {
-    const isProxy = state.geo.security?.proxy || state.geo.security?.vpn || false;
-    checks.push({
-      icon: 'info',
-      name: 'Proxy / VPN',
-      detail: isProxy ? 'A proxy or VPN connection was detected' : 'No proxy or VPN detected',
-    });
-  }
+  state.scan = { domain, checks };
 
-  // 6. Check browser connection info
-  if ('connection' in navigator) {
-    const conn = navigator.connection;
-    checks.push({
-      icon: 'info',
-      name: 'Connection Type',
-      detail: `${conn.effectiveType?.toUpperCase() || 'Unknown'} | Downlink: ${conn.downlink || 'N/A'} Mbps | RTT: ${conn.rtt || 'N/A'} ms`,
-    });
-  }
-
-  state.securityScan = checks;
-  resultsEl.innerHTML = checks.map(c => `
-    <div class="security-check">
-      <div class="check-icon check-icon--${c.icon}">
-        ${c.icon === 'pass' ? '&#x2713;' : c.icon === 'fail' ? '&#x2717;' : c.icon === 'warn' ? '!' : 'i'}
-      </div>
+  for (const c of checks) {
+    html += `<div class="security-check">
+      <div class="check-icon check-icon--${c.icon}">${c.icon === 'pass' ? '&#x2713;' : c.icon === 'fail' ? '&#x2717;' : c.icon === 'warn' ? '!' : 'i'}</div>
       <div>
-        <div class="check-name">${escapeHtml(c.name)}</div>
-        <div class="check-detail">${escapeHtml(c.detail)}</div>
+        <div class="check-name">${esc(c.name)}</div>
+        <div class="check-detail">${esc(c.detail)}</div>
+        ${c.value ? `<div class="check-value">${esc(c.value)}</div>` : ''}
       </div>
-    </div>
-  `).join('');
+    </div>`;
+  }
+  html += '</div>';
 
+  resultsEl.innerHTML = html;
   btn.disabled = false;
-  btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg> Run Again`;
+  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg> Scan';
 }
 
-async function checkWebRTCLeak() {
-  return new Promise((resolve) => {
+async function checkWebRTC() {
+  return new Promise(resolve => {
     const ips = new Set();
     try {
       const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
       pc.createDataChannel('');
-      pc.createOffer().then(offer => pc.setLocalDescription(offer));
-      pc.onicecandidate = event => {
-        if (!event.candidate) {
-          pc.close();
-          resolve([...ips]);
-          return;
-        }
-        const parts = event.candidate.candidate.split(' ');
+      pc.createOffer().then(o => pc.setLocalDescription(o));
+      pc.onicecandidate = e => {
+        if (!e.candidate) { pc.close(); resolve([...ips]); return; }
+        const parts = e.candidate.candidate.split(' ');
         if (parts.length > 4) {
           const ip = parts[4];
-          if (ip && !ip.endsWith('.local') && !ip.includes(':')) {
-            ips.add(ip);
-          }
+          if (ip && !ip.endsWith('.local') && !ip.includes(':')) ips.add(ip);
         }
       };
-      setTimeout(() => { pc.close(); resolve([...ips]); }, 4000);
-    } catch {
-      resolve([]);
-    }
+      setTimeout(() => { pc.close(); resolve([...ips]); }, 3000);
+    } catch { resolve([]); }
   });
 }
 
-// ============================================================
-// EXPORT FUNCTIONS
-// ============================================================
-function buildResultsText() {
-  const lines = ['=== NetScope Results ===', `Generated: ${new Date().toLocaleString()}`, ''];
+function dnsTypeName(t) {
+  const m = { 1:'A', 2:'NS', 5:'CNAME', 6:'SOA', 15:'MX', 16:'TXT', 28:'AAAA', 33:'SRV', 257:'CAA' };
+  return m[t] || `TYPE${t}`;
+}
 
+// ============================================================
+// EXPORT
+// ============================================================
+function buildText() {
+  const L = ['=== NetScope Results ===', `Generated: ${new Date().toLocaleString()}`, ''];
   if (state.ip) {
-    lines.push('--- Public IP & Network ---');
-    lines.push(`IP Address: ${state.ip}`);
+    L.push('--- IP & Location ---');
+    L.push(`IP: ${state.ip}`);
     if (state.geo) {
       const g = state.geo;
-      lines.push(`ISP: ${g.connection?.isp || g.org || 'N/A'}`);
-      lines.push(`Organization: ${g.connection?.org || g.org || 'N/A'}`);
-      lines.push(`ASN: ${g.connection?.asn ? 'AS' + g.connection.asn : (g.asn || 'N/A')}`);
-      lines.push(`Type: ${g.type || 'N/A'}`);
-      lines.push('');
-      lines.push('--- Geolocation ---');
-      lines.push(`Country: ${g.country || g.country_name || 'N/A'}`);
-      lines.push(`Region: ${g.region || 'N/A'}`);
-      lines.push(`City: ${g.city || 'N/A'}`);
-      lines.push(`Coordinates: ${g.latitude}, ${g.longitude}`);
-      lines.push(`Timezone: ${g.timezone?.id || g.timezone || 'N/A'}`);
+      L.push(`ISP: ${g.isp}`, `Org: ${g.org}`, `ASN: ${g.asn}`, `Type: ${g.type}`);
+      L.push(`Country: ${g.country}`, `Region: ${g.region}`, `City: ${g.city}`);
+      L.push(`Coords: ${g.lat}, ${g.lng}`, `Timezone: ${g.timezone}`);
     }
-    lines.push('');
+    L.push('');
   }
-
   if (state.speed.ping !== null) {
-    lines.push('--- Speed Test ---');
-    lines.push(`Ping: ${state.speed.ping?.toFixed(0) || '--'} ms`);
-    lines.push(`Download: ${state.speed.download?.toFixed(1) || '--'} Mbps`);
-    lines.push(`Upload: ${state.speed.upload?.toFixed(1) || '--'} Mbps`);
-    lines.push('');
+    L.push('--- Speed Test ---');
+    L.push(`Ping: ${state.speed.ping?.toFixed(0)} ms`);
+    L.push(`Download: ${state.speed.download?.toFixed(1)} Mbps`);
+    L.push(`Upload: ${state.speed.upload?.toFixed(1)} Mbps`);
+    L.push('');
   }
-
-  if (state.securityScan) {
-    lines.push('--- Security Scan ---');
-    state.securityScan.forEach(c => {
-      const icon = c.icon === 'pass' ? '[PASS]' : c.icon === 'fail' ? '[FAIL]' : c.icon === 'warn' ? '[WARN]' : '[INFO]';
-      lines.push(`${icon} ${c.name}: ${c.detail}`);
+  if (state.scan) {
+    L.push(`--- DNS & Security: ${state.scan.domain} ---`);
+    state.scan.checks.forEach(c => {
+      const tag = { pass: '[PASS]', fail: '[FAIL]', warn: '[WARN]', info: '[INFO]' }[c.icon] || '[?]';
+      L.push(`${tag} ${c.name}: ${c.detail}`);
     });
-    lines.push('');
+    L.push('');
   }
-
-  lines.push('Powered by NetScope');
-  return lines.join('\n');
+  L.push('Generated by NetScope');
+  return L.join('\n');
 }
 
 function exportCopy() {
-  const text = buildResultsText();
-  navigator.clipboard.writeText(text).then(() => {
-    showToast('Results copied to clipboard');
-  }).catch(() => {
-    showToast('Failed to copy');
-  });
+  navigator.clipboard.writeText(buildText()).then(() => showToast('Copied to clipboard')).catch(() => showToast('Copy failed'));
   document.getElementById('export-panel').classList.remove('open');
 }
 
 function exportEmail() {
-  const text = buildResultsText();
-  const subject = encodeURIComponent('NetScope - Network Security Results');
-  const body = encodeURIComponent(text);
-  window.open(`mailto:?subject=${subject}&body=${body}`, '_self');
+  const s = encodeURIComponent('NetScope Results');
+  const b = encodeURIComponent(buildText());
+  window.open(`mailto:?subject=${s}&body=${b}`, '_self');
   document.getElementById('export-panel').classList.remove('open');
 }
 
 function exportPDF() {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
-  const text = buildResultsText();
+  const text = buildText();
   const lines = doc.splitTextToSize(text, 170);
-
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(18);
   doc.setTextColor(59, 130, 246);
   doc.text('NetScope Report', 20, 20);
-
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  doc.setTextColor(100, 100, 100);
-  doc.text(`Generated: ${new Date().toLocaleString()}`, 20, 28);
-
+  doc.setFontSize(9);
+  doc.setTextColor(120, 120, 120);
+  doc.text(new Date().toLocaleString(), 20, 27);
   doc.setDrawColor(220, 220, 220);
-  doc.line(20, 32, 190, 32);
-
+  doc.line(20, 30, 190, 30);
   doc.setFontSize(10);
   doc.setTextColor(40, 40, 40);
-  let y = 40;
+  let y = 38;
   for (const line of lines) {
-    if (y > 280) {
-      doc.addPage();
-      y = 20;
-    }
+    if (y > 280) { doc.addPage(); y = 20; }
     if (line.startsWith('---')) {
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(59, 130, 246);
@@ -667,9 +753,8 @@ function exportPDF() {
     } else {
       doc.text(line, 20, y);
     }
-    y += 6;
+    y += 5.5;
   }
-
   doc.save('netscope-report.pdf');
   showToast('PDF downloaded');
   document.getElementById('export-panel').classList.remove('open');
@@ -678,28 +763,21 @@ function exportPDF() {
 // ============================================================
 // UTILITIES
 // ============================================================
-function setVal(id, value) {
+function setVal(id, val) {
   const el = document.getElementById(id);
-  el.textContent = value;
+  el.textContent = val;
   el.classList.remove('skeleton');
 }
 
 function showToast(msg) {
-  const toast = document.getElementById('toast');
-  toast.textContent = msg;
-  toast.classList.add('show');
-  setTimeout(() => toast.classList.remove('show'), 2500);
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
 }
 
-function formatLargeNumber(n) {
-  if (n >= 1e9) return (n / 1e9).toFixed(1) + 'B';
-  if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
-  if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
-  return n.toLocaleString();
-}
-
-function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
 }

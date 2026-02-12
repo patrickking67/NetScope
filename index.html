@@ -24,8 +24,7 @@
         <span>NetScope</span>
       </a>
       <nav class="nav">
-        <a href="#ip-info" class="nav-link active" data-section="ip-info">IP</a>
-        <a href="#geolocation" class="nav-link" data-section="geolocation">Location</a>
+        <a href="#ip-location" class="nav-link active" data-section="ip-location">IP &amp; Location</a>
         <a href="#speed-test" class="nav-link" data-section="speed-test">Speed</a>
         <a href="#breach-check" class="nav-link" data-section="breach-check">Breach</a>
         <a href="#dns-security" class="nav-link" data-section="dns-security">DNS</a>
@@ -46,26 +45,15 @@
       <h3>Export Results</h3>
       <div class="export-actions">
         <button class="export-btn" id="btn-copy">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
-            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-          </svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
           <span>Copy to Clipboard</span>
         </button>
         <button class="export-btn" id="btn-email">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
-            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-            <polyline points="22,6 12,13 2,6"/>
-          </svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
           <span>Share via Email</span>
         </button>
         <button class="export-btn" id="btn-pdf">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-            <polyline points="14 2 14 8 20 8"/>
-            <line x1="16" y1="13" x2="8" y2="13"/>
-            <line x1="16" y1="17" x2="8" y2="17"/>
-          </svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
           <span>Download PDF</span>
         </button>
       </div>
@@ -73,100 +61,51 @@
   </div>
 
   <main class="main">
-    <!-- IP Info Section -->
-    <section id="ip-info" class="card card--wide">
+    <!-- ===== IP & Location (combined) ===== -->
+    <section id="ip-location" class="card card--wide">
       <div class="card-header">
         <div class="card-icon card-icon--blue">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22">
-            <circle cx="12" cy="12" r="10"/>
-            <line x1="2" y1="12" x2="22" y2="12"/>
+            <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>
             <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
           </svg>
         </div>
         <div>
-          <h2 class="card-title">Public IP &amp; Network</h2>
-          <p class="card-subtitle">Your connection details</p>
+          <h2 class="card-title">IP &amp; Location</h2>
+          <p class="card-subtitle">Your public address and geolocation</p>
         </div>
       </div>
-      <div class="ip-hero">
-        <span class="ip-label">Your Public IP</span>
-        <span class="ip-address" id="ip-address">Detecting...</span>
-      </div>
-      <div class="info-grid" id="ip-details">
-        <div class="info-item">
-          <span class="info-label">ISP</span>
-          <span class="info-value skeleton" id="info-isp">&nbsp;</span>
+      <div class="ip-location-layout">
+        <div class="ip-info-col">
+          <div class="ip-hero">
+            <span class="ip-label">Your Public IP</span>
+            <span class="ip-address" id="ip-address">Detecting...</span>
+          </div>
+          <div class="info-grid">
+            <div class="info-item"><span class="info-label">ISP</span><span class="info-value skeleton" id="info-isp">&nbsp;</span></div>
+            <div class="info-item"><span class="info-label">Organization</span><span class="info-value skeleton" id="info-org">&nbsp;</span></div>
+            <div class="info-item"><span class="info-label">ASN</span><span class="info-value skeleton" id="info-asn">&nbsp;</span></div>
+            <div class="info-item"><span class="info-label">IP Type</span><span class="info-value skeleton" id="info-type">&nbsp;</span></div>
+            <div class="info-item"><span class="info-label">Proxy / VPN</span><span class="info-value skeleton" id="info-proxy">&nbsp;</span></div>
+            <div class="info-item"><span class="info-label">Hosting</span><span class="info-value skeleton" id="info-hosting">&nbsp;</span></div>
+          </div>
+          <div class="geo-details">
+            <div class="geo-item"><span class="geo-label">Country</span><span class="geo-value skeleton" id="geo-country">&nbsp;</span></div>
+            <div class="geo-item"><span class="geo-label">Region</span><span class="geo-value skeleton" id="geo-region">&nbsp;</span></div>
+            <div class="geo-item"><span class="geo-label">City</span><span class="geo-value skeleton" id="geo-city">&nbsp;</span></div>
+            <div class="geo-item"><span class="geo-label">Postal</span><span class="geo-value skeleton" id="geo-postal">&nbsp;</span></div>
+            <div class="geo-item"><span class="geo-label">Coordinates</span><span class="geo-value skeleton" id="geo-coords">&nbsp;</span></div>
+            <div class="geo-item"><span class="geo-label">Timezone</span><span class="geo-value skeleton" id="geo-timezone">&nbsp;</span></div>
+          </div>
         </div>
-        <div class="info-item">
-          <span class="info-label">Organization</span>
-          <span class="info-value skeleton" id="info-org">&nbsp;</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">ASN</span>
-          <span class="info-value skeleton" id="info-asn">&nbsp;</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">IP Type</span>
-          <span class="info-value skeleton" id="info-type">&nbsp;</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">Proxy / VPN</span>
-          <span class="info-value skeleton" id="info-proxy">&nbsp;</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">Hosting</span>
-          <span class="info-value skeleton" id="info-hosting">&nbsp;</span>
+        <div class="map-col">
+          <div id="map" class="map-container"></div>
         </div>
       </div>
     </section>
 
-    <!-- Geolocation Section -->
-    <section id="geolocation" class="card">
-      <div class="card-header">
-        <div class="card-icon card-icon--green">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22">
-            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
-            <circle cx="12" cy="10" r="3"/>
-          </svg>
-        </div>
-        <div>
-          <h2 class="card-title">Geolocation</h2>
-          <p class="card-subtitle">Physical location estimate</p>
-        </div>
-      </div>
-      <div id="map" class="map-container"></div>
-      <div class="geo-details" id="geo-details">
-        <div class="geo-item">
-          <span class="geo-label">Country</span>
-          <span class="geo-value" id="geo-country">
-            <span class="skeleton">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
-          </span>
-        </div>
-        <div class="geo-item">
-          <span class="geo-label">Region</span>
-          <span class="geo-value skeleton" id="geo-region">&nbsp;</span>
-        </div>
-        <div class="geo-item">
-          <span class="geo-label">City</span>
-          <span class="geo-value skeleton" id="geo-city">&nbsp;</span>
-        </div>
-        <div class="geo-item">
-          <span class="geo-label">Postal Code</span>
-          <span class="geo-value skeleton" id="geo-postal">&nbsp;</span>
-        </div>
-        <div class="geo-item">
-          <span class="geo-label">Coordinates</span>
-          <span class="geo-value skeleton" id="geo-coords">&nbsp;</span>
-        </div>
-        <div class="geo-item">
-          <span class="geo-label">Timezone</span>
-          <span class="geo-value skeleton" id="geo-timezone">&nbsp;</span>
-        </div>
-      </div>
-    </section>
-
-    <!-- Speed Test Section -->
-    <section id="speed-test" class="card">
+    <!-- ===== Speed Test ===== -->
+    <section id="speed-test" class="card card--wide">
       <div class="card-header">
         <div class="card-icon card-icon--purple">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22">
@@ -175,77 +114,72 @@
         </div>
         <div>
           <h2 class="card-title">Speed Test</h2>
-          <p class="card-subtitle">Connection performance</p>
+          <p class="card-subtitle">Measure your connection performance</p>
         </div>
       </div>
-      <div class="speed-results" id="speed-results">
-        <div class="speed-gauge">
+      <div class="speed-layout">
+        <div class="speed-gauge-wrap">
           <div class="gauge-ring" id="gauge-ring">
-            <svg viewBox="0 0 120 120">
-              <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="8"/>
-              <circle cx="60" cy="60" r="52" fill="none" stroke="url(#gauge-gradient)" stroke-width="8"
-                stroke-dasharray="326.73" stroke-dashoffset="326.73" stroke-linecap="round"
-                transform="rotate(-90 60 60)" id="gauge-circle"/>
+            <svg viewBox="0 0 140 140">
+              <circle cx="70" cy="70" r="58" fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="10"/>
+              <circle cx="70" cy="70" r="58" fill="none" stroke="url(#speed-grad)" stroke-width="10"
+                stroke-dasharray="364.42" stroke-dashoffset="364.42" stroke-linecap="round"
+                transform="rotate(-90 70 70)" id="gauge-circle"/>
               <defs>
-                <linearGradient id="gauge-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                <linearGradient id="speed-grad" x1="0%" y1="0%" x2="100%" y2="0%">
                   <stop offset="0%" stop-color="#8b5cf6"/>
-                  <stop offset="100%" stop-color="#06b6d4"/>
+                  <stop offset="50%" stop-color="#06b6d4"/>
+                  <stop offset="100%" stop-color="#10b981"/>
                 </linearGradient>
               </defs>
             </svg>
-            <div class="gauge-value">
+            <div class="gauge-center">
               <span class="gauge-number" id="gauge-number">--</span>
               <span class="gauge-unit">Mbps</span>
             </div>
           </div>
+          <div class="speed-phase" id="speed-phase">Ready</div>
         </div>
         <div class="speed-metrics">
           <div class="speed-metric">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-            </svg>
-            <div>
-              <span class="metric-label">Ping</span>
+            <div class="metric-icon metric-icon--ping">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            </div>
+            <span class="metric-label">Ping</span>
+            <div class="metric-row">
               <span class="metric-value" id="speed-ping">--</span>
               <span class="metric-unit">ms</span>
             </div>
           </div>
           <div class="speed-metric">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-              <polyline points="7 10 12 15 17 10"/>
-              <line x1="12" y1="15" x2="12" y2="3"/>
-            </svg>
-            <div>
-              <span class="metric-label">Download</span>
+            <div class="metric-icon metric-icon--download">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            </div>
+            <span class="metric-label">Download</span>
+            <div class="metric-row">
               <span class="metric-value" id="speed-download">--</span>
               <span class="metric-unit">Mbps</span>
             </div>
           </div>
           <div class="speed-metric">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-              <polyline points="17 8 12 3 7 8"/>
-              <line x1="12" y1="3" x2="12" y2="15"/>
-            </svg>
-            <div>
-              <span class="metric-label">Upload</span>
+            <div class="metric-icon metric-icon--upload">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            </div>
+            <span class="metric-label">Upload</span>
+            <div class="metric-row">
               <span class="metric-value" id="speed-upload">--</span>
               <span class="metric-unit">Mbps</span>
             </div>
           </div>
         </div>
       </div>
-      <div class="speed-status" id="speed-status">Click below to test your connection speed</div>
-      <button class="btn btn--primary btn--speed" id="btn-speed-test">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
-          <polygon points="5 3 19 12 5 21 5 3"/>
-        </svg>
+      <button class="btn btn--primary btn--full" id="btn-speed-test">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><polygon points="5 3 19 12 5 21 5 3"/></svg>
         Start Speed Test
       </button>
     </section>
 
-    <!-- Breach Check Section -->
+    <!-- ===== Breach Check ===== -->
     <section id="breach-check" class="card card--wide">
       <div class="card-header">
         <div class="card-icon card-icon--red">
@@ -255,100 +189,69 @@
         </div>
         <div>
           <h2 class="card-title">Breach Check</h2>
-          <p class="card-subtitle">Powered by Have I Been Pwned</p>
+          <p class="card-subtitle">Check if your credentials have been exposed</p>
         </div>
       </div>
       <div class="breach-tabs">
-        <button class="breach-tab active" data-tab="password">Password Check</button>
-        <button class="breach-tab" data-tab="stats">Breach Database</button>
+        <button class="breach-tab active" data-tab="email">Check Email</button>
+        <button class="breach-tab" data-tab="password">Check Password</button>
       </div>
-      <div class="breach-content" id="breach-password" data-tab-content="password">
-        <div class="password-input-group">
+
+      <!-- Email Mode -->
+      <div class="breach-content" id="breach-email" data-tab-content="email">
+        <div class="input-row">
+          <input type="email" id="email-input" class="input-field" placeholder="Enter your email address..." autocomplete="off">
+          <button class="btn btn--danger" id="btn-email-check">Check Breaches</button>
+        </div>
+        <div class="security-notice security-notice--blue">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          Checked against known breach databases. Your email is sent to the API for lookup.
+        </div>
+        <div class="breach-result" id="email-result"></div>
+      </div>
+
+      <!-- Password Mode -->
+      <div class="breach-content hidden" id="breach-password" data-tab-content="password">
+        <div class="input-row">
           <div class="input-wrapper">
             <input type="password" id="password-input" class="input-field" placeholder="Enter a password to check..." autocomplete="off">
             <button class="input-toggle" id="toggle-password" title="Show password">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                <circle cx="12" cy="12" r="3"/>
-              </svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
             </button>
           </div>
-          <button class="btn btn--danger" id="btn-breach-check">Check</button>
+          <button class="btn btn--danger" id="btn-password-check">Check</button>
         </div>
-        <div class="security-notice">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-          </svg>
-          Your password is hashed locally and never sent over the network. Only the first 5 characters of the SHA-1 hash are transmitted (k-anonymity).
+        <div class="security-notice security-notice--green">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          Your password never leaves your browser. Only the first 5 characters of the SHA-1 hash are sent (k-anonymity).
         </div>
-        <div class="breach-result" id="breach-result"></div>
-      </div>
-      <div class="breach-content hidden" id="breach-stats" data-tab-content="stats">
-        <div class="stats-grid" id="stats-grid">
-          <div class="stat-card">
-            <span class="stat-number" id="stat-total-breaches">--</span>
-            <span class="stat-label">Total Breaches</span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-number" id="stat-total-accounts">--</span>
-            <span class="stat-label">Compromised Accounts</span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-number" id="stat-latest-breach">--</span>
-            <span class="stat-label">Most Recent Breach</span>
-          </div>
-        </div>
-        <div class="breach-list-header">
-          <h3>Recent Breaches</h3>
-        </div>
-        <div class="breach-list" id="breach-list"></div>
+        <div class="breach-result" id="password-result"></div>
       </div>
     </section>
 
-    <!-- DNS Security Section -->
+    <!-- ===== DNS & Security ===== -->
     <section id="dns-security" class="card card--wide">
       <div class="card-header">
         <div class="card-icon card-icon--cyan">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22">
-            <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>
-            <rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
-            <line x1="6" y1="6" x2="6.01" y2="6"/>
-            <line x1="6" y1="18" x2="6.01" y2="18"/>
+            <rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/>
+            <line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>
           </svg>
         </div>
         <div>
-          <h2 class="card-title">DNS &amp; Security</h2>
-          <p class="card-subtitle">DNS resolution &amp; leak detection</p>
+          <h2 class="card-title">DNS &amp; Security Scan</h2>
+          <p class="card-subtitle">Analyze DNS records and email security</p>
         </div>
       </div>
-      <div class="dns-tools">
-        <div class="dns-tool-section">
-          <h3>DNS Lookup</h3>
-          <div class="dns-input-group">
-            <input type="text" id="dns-domain" class="input-field" placeholder="example.com" value="cloudflare.com">
-            <select id="dns-type" class="input-select">
-              <option value="A">A</option>
-              <option value="AAAA">AAAA</option>
-              <option value="MX">MX</option>
-              <option value="TXT">TXT</option>
-              <option value="NS">NS</option>
-              <option value="CNAME">CNAME</option>
-            </select>
-            <button class="btn btn--primary" id="btn-dns-lookup">Lookup</button>
-          </div>
-          <div class="dns-results" id="dns-results"></div>
-        </div>
-        <div class="dns-tool-section">
-          <h3>Security Scan</h3>
-          <button class="btn btn--primary" id="btn-security-scan">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-            </svg>
-            Run Security Scan
-          </button>
-          <div class="security-results" id="security-results"></div>
-        </div>
+      <div class="input-row">
+        <input type="text" id="scan-input" class="input-field" placeholder="Enter a domain or email address..." value="">
+        <button class="btn btn--primary" id="btn-scan">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          Scan
+        </button>
       </div>
+      <p class="input-hint">e.g. <strong>google.com</strong> or <strong>you@gmail.com</strong> &mdash; we'll check DNS records, SPF, DMARC, and more</p>
+      <div id="scan-results"></div>
     </section>
   </main>
 
@@ -356,7 +259,7 @@
   <div class="toast" id="toast"></div>
 
   <footer class="footer">
-    <p>All checks run client-side. No data is stored or transmitted to third parties beyond the listed APIs.</p>
+    <p>All checks run client-side. No data is stored. APIs used: ipapi.co, HIBP, XposedOrNot, Google DNS.</p>
   </footer>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
