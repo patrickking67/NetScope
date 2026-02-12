@@ -37,11 +37,11 @@ Pure HTML, CSS, and JavaScript. No frameworks, no build step, no backend.
 
 ```bash
 # Clone
-git clone https://github.com/patrickking67/netscope.git
-cd netscope
+git clone https://github.com/patrickking67/NetScope.git
+cd NetScope
 
 # Serve locally
-npx serve src
+npx serve .
 ```
 
 ## License
